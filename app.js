@@ -3,6 +3,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const express = require('express')
+const { getUser } = require('./_helpers')
 
 const app = express()
 const port = process.env.PORT || 3000
@@ -23,11 +24,6 @@ app.use(express.json())
 // Setting passport
 app.use(passport.initialize())
 app.use(passport.session())
-
-app.use((req, res, next) => {
-  res.locals.user = getUser(req)
-  next()
-})
 
 // Setting middleware
 app.use(methodOverride('_method'))

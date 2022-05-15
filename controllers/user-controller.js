@@ -151,37 +151,6 @@ const userController = {
       .catch(err => next(err))
   },
 
-  putUser: (req, res) => {
-    const { account, name, email, password, checkPassword } = req.body
-    const userId = Number(req.params.id)
-    const reqUserId = getUser(req).id
-
-    // check if user is the current user
-    if (userId !== reqUserId) throw new Error('Permission denied')
-    // check password
-    if (password !== checkPassword) throw new Error('密碼與確認密碼不符！')
-    // check account
-    if (!account || !name || !email) { throw new Error('帳號、名稱和 email 欄位不可空白！') }
-    if (name.length > 50 || account.length > 50) { throw new Error('字數上限為 50 個字！') }
-
-    return Promise.all([
-      User.findAll({ $or: [{ where: { email } }, { where: { account } }] }),
-      User.findByPk(userId),
-      bcrypt.hash(password, 10)
-    ])
-      .then(user => {
-        if (!user) throw new Error('帳號不存在！')
-        return user.update({
-          name,
-          introduction,
-          avatar: avatar || user.avatar,
-          cover: cover || user.cover
-        })
-      })
-      .then(updatedUser => res.status(200).json({ user: updatedUser }))
-      .catch(err => next(err))
-  },
-
   getUsersTweets: (req, res, next) => {
     const UserId = Number(req.params.id)
     Tweet.findAll({

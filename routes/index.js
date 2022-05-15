@@ -4,7 +4,6 @@ const passport = require('../config/passport')
 
 const userController = require('../controllers/user-controller')
 const tweetController = require('../controllers/tweet-controller')
-const upload = require('../middleware/multer')
 const { apiErrorHandler } = require('../middleware/error-handler')
 
 const { authenticated, authenticatedUser } = require('../middleware/auth')
