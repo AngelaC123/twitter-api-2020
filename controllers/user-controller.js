@@ -175,7 +175,7 @@ const userController = {
           password: hash
         })
       })
-      .then(updatedUser => res.status(200).json({ message: '成功編輯使用者個人資料！', user: updatedUser }))
+      .then(updatedUser => res.status(200).json(user: updatedUser))
       .catch(err => next(err))
   },
 
@@ -417,7 +417,7 @@ const userController = {
         })
       })
       .then(getFollowing => {
-        res.status(200).json({ message: '成功追蹤使用者！', getFollowing })
+        res.status(200).json(getFollowing)
       })
       .catch(err => next(err))
   },
@@ -445,7 +445,7 @@ const userController = {
           }
         })
       })
-      .then(removeFollowing => res.status(200).json({ message: '成功取消追蹤該名使用者！', removeFollowing }))
+      .then(removeFollowing => res.status(200).json(removeFollowing))
       .catch(err => next(err))
   }
 }
