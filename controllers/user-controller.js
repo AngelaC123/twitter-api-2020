@@ -73,19 +73,36 @@ const userController = {
 
   getUser: (req, res, next) => {
     const UserId = Number(req.params.id)
+    const reqUserId = helpers.getUser(req).id
     return User.findByPk(UserId, {
-      attributes: [
-        'id', 'account', 'name', 'email', 'avatar', 'cover', 'introduction', 'createdAt',
-        [Sequelize.literal('(SELECT COUNT(DISTINCT following_id) FROM Followships WHERE  following_id = User.id)'), 'followerCount'],
-        [Sequelize.literal('(SELECT COUNT(DISTINCT follower_id) FROM Followships WHERE  follower_id = User.id)'), 'followingCount']
+      include: [
+        { model: Tweet },
+        { model: User, as: 'Followers' },
+        { model: User, as: 'Followings' }
       ]
-
     })
-      .then(user => {
-        if (!user || user.role === 'admin') throw new Error('帳號不存在！')
+      .then(updatedUser => {
+        if (!updatedUser || updatedUser.role === 'admin') throw new Error('帳號不存在！')
+        const { id, account, name, email, introduction, avatar, cover, createdAt } = updatedUser
+        updatedUser.owner = reqUserId === UserId || false
+        const isFollowed = req.user.Followings.some(
+          f => f.id === updatedUser.id
+        )
         return res.status(200).json({
           message: '成功取得使用者資料！',
-          user
+          id,
+          account,
+          name,
+          email,
+          introduction,
+          avatar,
+          cover,
+          createdAt,
+          tweetCount: updatedUser.Tweets.length,
+          followingCount: updatedUser.Followings.length,
+          followerCount: updatedUser.Followers.length,
+          owner: updatedUser.owner,
+          isFollowed
         })
       })
       .catch(err => next(err))
@@ -321,7 +338,7 @@ const userController = {
           [Sequelize.literal('(SELECT avatar FROM Users WHERE id = following_id)'), 'avatar'],
           [Sequelize.literal('(SELECT name FROM Users WHERE id = following_id)'), 'name'],
           [Sequelize.literal('(SELECT introduction FROM Users WHERE id = following_id)'), 'introduction'],
-          [Sequelize.literal(`(CASE WHEN follower_id = ${UserId} THEN true ELSE false END)`), 'isFollowing']
+          [Sequelize.literal(`(CASE WHEN follower_id = ${helpers.getUser(req).id} THEN true ELSE false END)`), 'isFollowing']
         ],
         order: [['createdAt', 'DESC'], ['id', 'DESC']],
         raw: true,
@@ -337,7 +354,7 @@ const userController = {
 
   getFollowers: (req, res, next) => {
     const UserId = Number(req.params.id)
-    // const reqUserId = helpers.getUser(req)
+    const reqUserId = helpers.getUser(req)
     Promise.all([
       Followship.findAll({
         where: { followingId: UserId },
@@ -346,7 +363,7 @@ const userController = {
           [Sequelize.literal('(SELECT avatar FROM Users WHERE id = follower_id)'), 'avatar'],
           [Sequelize.literal('(SELECT name FROM Users WHERE id = follower_id)'), 'name'],
           [Sequelize.literal('(SELECT introduction FROM Users WHERE id = follower_id)'), 'introduction'],
-          [Sequelize.literal(`(CASE WHEN follower_id = ${UserId} THEN true ELSE false END)`), 'isFollowing']
+          [Sequelize.literal(`(CASE WHEN follower_id = ${reqUserId} THEN true ELSE false END)`), 'isFollowing']
         ],
         order: [['createdAt', 'DESC'], ['id', 'DESC']],
         raw: true,
