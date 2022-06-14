@@ -94,7 +94,7 @@ const userController = {
 
   getCurrentUser: (req, res, next) => {
     try {
-      const userData = (({ id, account, name, email, avatar, role }) => ({ id, account, name, email, avatar, role }))(helpers.getUser(req))
+      const userData = (({ id, account, name, email, avatar, role }) => ({ id, account, name, email, avatar, role }))(getUser(req))
       return res.status(200).json(userData)
     } catch (err) {
       next(err)
@@ -102,8 +102,7 @@ const userController = {
   },
 
   getTopUsers: (req, res, next) => {
-    const userId = Number(req.params.id)
-    const reqUserId = helpers.getUser(req).id
+    const reqUserId = Number(getUser(req).id)
     return User.findAll({
       include: { model: User, as: 'Followers' },
       attributes: ['id', 'account', 'name', 'avatar', 'createdAt'],
@@ -114,15 +113,12 @@ const userController = {
           .map(user => ({
             ...user.toJSON(),
             followerCount: user.Followers.length,
-            isFollowed: helpers.getUser(req).Followings.some(f => f.id === user.id),
-            owner: reqUserId !== userId
+            isFollowed: getUser(req).Followings.some(f => f.id === user.id),
+            owner: reqUserId === user.id,
+            Followers: ''
           }))
           .sort((a, b) => b.followerCount - a.followerCount || b.createdAt - a.createdAt)
           .slice(0, 10)
-
-        result.forEach(r => {
-          delete r.Followers
-        })
 
         return res.status(200).json(result)
       })
