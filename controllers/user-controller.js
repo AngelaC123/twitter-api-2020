@@ -4,13 +4,13 @@ const Sequelize = require('sequelize')
 
 const { User, Tweet, Followship, Reply, Like } = require('../models')
 
-const helpers = require('../_helpers')
+const { getUser } = require('../_helpers')
 const { imgurFileHandler } = require('../helpers/file-helpers')
 
 const userController = {
   signIn: (req, res, next) => {
     const { account, password } = req.body
-    // make sure all fields are filled
+
     if (!account || !password) throw new Error('帳號和密碼為必填！')
 
     User.findOne({ where: { account } })
@@ -33,16 +33,15 @@ const userController = {
   signUp: (req, res, next) => {
     const { account, name, email, password, checkPassword } = req.body
     if (password !== checkPassword) throw new Error('密碼與確認密碼不符！')
-    if (!account || !name || !email || !password || !checkPassword) { throw new Error('此欄位不可空白！') }
+    if (!account || !name || !email || !password || !checkPassword) throw new Error('此欄位不可空白！')
 
-    // 確認資料裡面沒有相同的 email，若有，就建立一個 Error 物件並拋出
     User.findAll({
       $or: [{ where: { email } }, { where: { account } }]
     })
       .then(users => {
-        if (users.some(u => u.email === email)) { throw new Error('此 Email 已被註冊！') }
-        if (users.some(u => u.account === account)) { throw new Error('此帳號已被註冊！') }
-        if (name.length > 50 || account.length > 50) { throw new Error('字數上限為 50 個字！') }
+        if (users.some(u => u.email === email)) throw new Error('此 Email 已被註冊！')
+        if (users.some(u => u.account === account)) throw new Error('此帳號已被註冊！')
+        if (name.length > 50 || account.length > 50) throw new Error('字數上限為 50 個字！')
 
         return bcrypt.hash(password, 10)
       })
@@ -62,7 +61,6 @@ const userController = {
           expiresIn: '30d'
         })
         return res.status(200).json({
-
           token,
           user: userData
         })
@@ -72,36 +70,24 @@ const userController = {
 
   getUser: (req, res, next) => {
     const UserId = Number(req.params.id)
-    const reqUserId = helpers.getUser(req).id
+    const reqUserId = getUser(req).id
     return User.findByPk(UserId, {
       include: [
-        { model: Tweet },
         { model: User, as: 'Followers' },
         { model: User, as: 'Followings' }
       ]
     })
-      .then(updatedUser => {
-        if (!updatedUser || updatedUser.role === 'admin') throw new Error('帳號不存在！')
-        const { id, account, name, email, introduction, avatar, cover, createdAt } = updatedUser
-        updatedUser.owner = reqUserId === UserId || false
-        const isFollowed = req.user.Followings.some(
-          f => f.id === updatedUser.id
-        )
-        return res.status(200).json({
-          id,
-          account,
-          name,
-          email,
-          introduction,
-          avatar,
-          cover,
-          createdAt,
-          tweetCount: updatedUser.Tweets.length,
-          followingCount: updatedUser.Followings.length,
-          followerCount: updatedUser.Followers.length,
-          owner: updatedUser.owner,
-          isFollowed
-        })
+      .then(onCheckedUser => {
+        if (!onCheckedUser || onCheckedUser.role === 'admin') throw new Error('帳號不存在！')
+        const userData = onCheckedUser.toJSON()
+        userData.followingCount = onCheckedUser.Followings.length
+        userData.followerCount = onCheckedUser.Followers.length
+        userData.owner = reqUserId === UserId
+        userData.isFollowed = getUser(req).Followings.some(f => f.id === onCheckedUser.id)
+
+        delete userData.Followers
+        delete userData.Followings
+        return res.status(200).json(userData)
       })
       .catch(err => next(err))
   },
