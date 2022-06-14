@@ -310,28 +310,21 @@ const userController = {
   },
 
   getFollowings: (req, res, next) => {
-    return Promise.all([
-      User.findByPk(req.params.id, {
-        include: { model: User, as: 'Followings' },
-        order: [['Followings', Followship, 'createdAt', 'DESC']]
-      }),
-      Followship.findAll({
-        where: { followerId: getUser(req).id }
-      })
-    ])
-      .then(([user, following]) => {
-        if (!user.Followings.length) res.status(200).json([])
+    User.findByPk(req.params.id, {
+      attributes: [],
+      include: { model: User, as: 'Followings', attributes: ['id', 'name', 'account', 'avatar', 'introduction'] },
+      order: [['Followings', Followship, 'createdAt', 'DESC']]
+    })
+      .then(user => {
+        if (!user.Followings.length) res.status(200).json({ message: '該使用者沒有正在追隨清單!' })
 
-        const isFollowed = following.map(f => f.followingId)
-        const data = user.Followings.map(f => ({
-          followingId: f.id,
-          account: f.account,
-          name: f.name,
-          avatar: f.avatar,
-          introduction: f.introduction,
-          isFollowed: isFollowed.some(id => id === f.id)
+        const followinId = getUser(req)?.Followings ? getUser(req).Followings.map(f => f.id) : []
+        const followingList = user.Followings.map(f => ({
+          ...f.toJSON(),
+          isFollowed: followinId.some(id => id === f.id),
+          Followship: ''
         }))
-        return res.status(200).json(data)
+        return res.status(200).json(followingList)
       })
       .catch(err => next(err))
   },
