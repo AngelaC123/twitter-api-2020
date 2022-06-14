@@ -128,7 +128,7 @@ const userController = {
   putUserSetting: (req, res, next) => {
     const { account, name, email, password, checkPassword } = req.body
     const userId = Number(req.params.id)
-    const reqUserId = helpers.getUser(req).id
+    const reqUserId = getUser(req).id
 
     if (userId !== reqUserId) throw new Error('使用者只能修改自己的資料！')
     if (password !== checkPassword) throw new Error('密碼與確認密碼不符！')
@@ -148,8 +148,8 @@ const userController = {
     ])
       .then(([checkUsers, user, hash]) => {
         if (!user) throw new Error('帳號不存在！')
-        if (checkUsers.some(u => u.email === email && u.id !== reqUserId)) { throw new Error('此 Email 已被註冊！') }
-        if (checkUsers.some(u => u.account === account && u.id !== reqUserId)) { throw new Error('此帳號已被註冊！') }
+        if (checkUsers.some(u => u.email === email && u.id !== reqUserId)) throw new Error('此 Email 已被註冊！')
+        if (checkUsers.some(u => u.account === account && u.id !== reqUserId)) throw new Error('此帳號已被註冊！')
         return user.update({
           account,
           name,
@@ -161,33 +161,34 @@ const userController = {
       .catch(err => next(err))
   },
 
-  putUser: async (req, res, next) => {
-    try {
-      const UserId = req.params.id
-      const reqUser = helpers.getUser(req).id
+  putUser: (req, res, next) => {
+    const UserId = Number(req.params.id)
+    const reqUser = Number(getUser(req).id)
 
-      const { name, introduction } = req.body
-      const { files } = req
-      if (!name || !introduction) throw new Error('名字和自介欄位不可空白！')
-      if (name.length > 50) throw new Error('名稱欄位字數上限為 50 個字！')
-      if (introduction.length > 160) throw new Error('自介欄位字數上限為 160 個字！')
+    const { name, introduction } = req.body
+    const { files } = req
+    if (!name || !introduction) throw new Error('名字和自介欄位不可空白！')
+    if (name.length > 50) throw new Error('名稱欄位字數上限為 50 個字！')
+    if (introduction.length > 160) throw new Error('自介欄位字數上限為 160 個字！')
 
-      let avatar = files?.avatar || null
-      let cover = files?.cover || null
-      if (avatar) avatar = await imgurFileHandler(avatar[0])
-      if (cover) cover = await imgurFileHandler(cover[0])
+    const avatar = files?.avatar ? files.avatar[0] : null
+    const cover = files?.cover ? files.cover[0] : null
 
-      const user = await User.findByPk(UserId)
-      const data = await user.update({
-        name,
-        introduction,
-        avatar: avatar || reqUser.avatar,
-        cover: cover || reqUser.cover
+    Promise.all([
+      User.findByPk(UserId),
+      imgurFileHandler(avatar),
+      imgurFileHandler(cover)
+    ])
+      .then(([user, avatar, cover]) => {
+        return user.update({
+          name,
+          introduction,
+          avatar: avatar || reqUser.avatar,
+          cover: cover || reqUser.cover
+        })
       })
-      res.status(200).json(data)
-    } catch (err) {
-      next(err)
-    }
+      .then(updatedUser => res.status(200).json(updatedUser))
+      .catch(err => next(err))
   },
 
   getUsersTweets: (req, res, next) => {
@@ -214,7 +215,7 @@ const userController = {
       .then(([tweets, user]) => {
         if (!user) throw new Error('使用者不存在！')
         if (tweets.length <= 0) return res.status(200).json({ message: '該使用者沒有推文！' })
-        const likedTweetId = helpers.getUser(req)?.LikedTweets ? helpers.getUser(req).LikedTweets.map(l => l.id) : []
+        const likedTweetId = getUser(req)?.LikedTweets ? getUser(req).LikedTweets.map(l => l.id) : []
         const tweetList = tweets.map(data => ({
           ...data,
           isLiked: likedTweetId.some(item => item === data.id)
@@ -291,7 +292,7 @@ const userController = {
       .then(([likes, user]) => {
         if (!user) throw new Error('使用者不存在！')
         if (likes.length <= 0) return res.status(200).json({ message: '該使用者沒有Like任何推文!' })
-        const likedTweetId = helpers.getUser(req)?.LikedTweets ? helpers.getUser(req).LikedTweets.map(l => l.id) : []
+        const likedTweetId = getUser(req)?.LikedTweets ? getUser(req).LikedTweets.map(l => l.id) : []
         const likeList = likes.map(data => ({
           ...data,
           Tweet: {
@@ -315,7 +316,7 @@ const userController = {
         order: [['Followings', Followship, 'createdAt', 'DESC']]
       }),
       Followship.findAll({
-        where: { followerId: helpers.getUser(req).id }
+        where: { followerId: getUser(req).id }
       })
     ])
       .then(([user, following]) => {
@@ -341,7 +342,7 @@ const userController = {
         order: [['Followers', Followship, 'createdAt', 'DESC']]
       }),
       Followship.findAll({
-        where: { followerId: helpers.getUser(req).id },
+        where: { followerId: getUser(req).id },
         raw: true,
         nest: true
       })
@@ -364,7 +365,7 @@ const userController = {
   },
   addFollowing: (req, res, next) => {
     const followingId = Number(req.body.id)
-    const followerId = helpers.getUser(req).id
+    const followerId = getUser(req).id
 
     if (followingId === followerId) throw new Error('不能追蹤自己!')
     return Promise.all([
@@ -392,7 +393,7 @@ const userController = {
 
   removeFollowing: (req, res, next) => {
     const followingId = Number(req.params.id)
-    const followerId = helpers.getUser(req).id
+    const followerId = getUser(req).id
     if (followingId === followerId) throw new Error('不能取消追蹤自己!')
     return Promise.all([
       User.findByPk(followingId),
