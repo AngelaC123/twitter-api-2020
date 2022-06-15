@@ -311,51 +311,44 @@ const userController = {
 
   getFollowings: (req, res, next) => {
     User.findByPk(req.params.id, {
-      attributes: [],
-      include: { model: User, as: 'Followings', attributes: ['id', 'name', 'account', 'avatar', 'introduction'] },
+      include: { model: User, as: 'Followings', attributes: [['id', 'followingId'], 'name', 'account', 'avatar', 'introduction'] },
       order: [['Followings', Followship, 'createdAt', 'DESC']]
     })
+
       .then(user => {
         if (!user.Followings.length) res.status(200).json({ message: '該使用者沒有正在追隨清單!' })
 
-        const followinId = getUser(req)?.Followings ? getUser(req).Followings.map(f => f.id) : []
+        const followingId = getUser(req)?.Followings ? getUser(req).Followings.map(f => f.id) : []
         const followingList = user.Followings.map(f => ({
           ...f.toJSON(),
-          isFollowed: followinId.some(id => id === f.id),
+          isFollowed: followingId.some(id => id === f.id),
           Followship: ''
         }))
         return res.status(200).json(followingList)
       })
       .catch(err => next(err))
   },
-  getFollowers: (req, res, next) => {
-    return Promise.all([
-      User.findByPk(req.params.id, {
-        include: { model: User, as: 'Followers' },
-        order: [['Followers', Followship, 'createdAt', 'DESC']]
-      }),
-      Followship.findAll({
-        where: { followerId: getUser(req).id },
-        raw: true,
-        nest: true
-      })
-    ])
-      .then(([user, following]) => {
-        if (!user.Followers.length) res.status(200).json([])
 
-        const isFollowed = following.map(f => f.followingId)
-        const data = user.Followers.map(f => ({
-          followerId: f.id,
-          account: f.account,
-          name: f.name,
-          avatar: f.avatar,
-          introduction: f.introduction,
-          isFollowed: isFollowed.some(id => id === f.id)
+  getFollowers: (req, res, next) => {
+    User.findByPk(req.params.id, {
+      include: { model: User, as: 'Followers', attributes: [['id', 'followerId'], 'name', 'account', 'avatar', 'introduction'] },
+      order: [['Followers', Followship, 'createdAt', 'DESC']]
+    })
+
+      .then(user => {
+        if (!user.Followers.length) res.status(200).json({ message: '該使用者沒有追隨者!' })
+
+        const followingId = getUser(req)?.Followings ? getUser(req).Followings.map(f => f.id) : []
+        const followerList = user.Followers.map(f => ({
+          ...f.toJSON(),
+          isFollowed: followingId.some(id => id === f.id),
+          Followship: ''
         }))
-        return res.status(200).json(data)
+        return res.status(200).json(followerList)
       })
       .catch(err => next(err))
   },
+
   addFollowing: (req, res, next) => {
     const followingId = Number(req.body.id)
     const followerId = getUser(req).id
