@@ -5,6 +5,7 @@ const Sequelize = require('sequelize')
 const { User, Tweet, Followship, Reply, Like } = require('../models')
 
 const { getUser } = require('../_helpers')
+
 const { imgurFileHandler } = require('../helpers/file-helpers')
 
 const userController = {
@@ -352,7 +353,6 @@ const userController = {
   addFollowing: (req, res, next) => {
     const followingId = Number(req.body.id)
     const followerId = getUser(req).id
-
     if (followingId === followerId) throw new Error('不能追蹤自己!')
     return Promise.all([
       User.findByPk(followingId),
@@ -371,8 +371,8 @@ const userController = {
           followerId
         })
       })
-      .then(getFollowing => {
-        res.status(200).json(getFollowing)
+      .then(following => {
+        res.status(200).json({ message: '已成功追隨該使用者！', following })
       })
       .catch(err => next(err))
   },
@@ -393,14 +393,9 @@ const userController = {
       .then(([user, isFollowed]) => {
         if (!user) throw new Error('無法取消追蹤不存在的使用者!')
         if (!isFollowed) throw new Error('你尚未追蹤該名使用者，不能取消追蹤！')
-        return Followship.destroy({
-          where: {
-            followingId,
-            followerId
-          }
-        })
+        return isFollowed.destroy()
       })
-      .then(removeFollowing => res.status(200).json(removeFollowing))
+      .then(removeFollowing => res.status(200).json({ message: '已成功取消追隨該使用者！', removeFollowing }))
       .catch(err => next(err))
   }
 }
